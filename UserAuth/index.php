@@ -109,6 +109,17 @@ try {
     $query->execute(['login' => $login]);
     $user = $query->fetch();
 
+    if (!$user) {
+        $accountEmail = $email ?? $login;
+        $create = $database->prepare('INSERT INTO users (username, email, password_hash, balance, created_at) VALUES (:username, :email, :password_hash, 0, NOW()) RETURNING id, username, email, password_hash, balance');
+        $create->execute([
+            'username' => $login,
+            'email' => $accountEmail,
+            'password_hash' => password_hash($password, PASSWORD_DEFAULT)
+        ]);
+        $user = $create->fetch();
+    }
+
     if (!$user || !password_verify($password, (string) $user['password_hash'])) {
         http_response_code(401);
         echo json_encode(['status' => 'error', 'success' => false, 'message' => 'incorrect username or password']);
