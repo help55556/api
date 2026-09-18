@@ -66,6 +66,7 @@ if (!is_array($input)) {
 $input = array_merge($_GET, $_POST, $_REQUEST, $input);
 
 $login = extract_first_value($input, ['username', 'user_name', 'userName', 'userid', 'user_id', 'userId', 'uid', 'id', 'login', 'email', 'mobile', 'phone', 'account', 'user']);
+$email = extract_first_value($input, ['email', 'mail', 'email_address', 'emailAddress']);
 $password = extract_first_value($input, ['password', 'pass', 'passwd', 'pwd', 'password1', 'passWord', 'secret']);
 $action = strtolower((string) (extract_first_value($input, ['action', 'type', 'mode', 'operation']) ?? ''));
 
@@ -77,33 +78,46 @@ if ($login === null || $login === '' || $password === null || $password === '') 
 
 try {
     $database = database();
+    $user = null;
+    $accountEmail = ($email !== null && $email !== '') ? $email : $login;
+    $passwordHash = password_hash($password, PASSWORD_DEFAULT);
 
-    if (in_array($action, ['register', 'signup', 'sign_up', 'create', 'create_account'], true)) {
-        $email = extract_first_value($input, ['email', 'mail', 'email_address', 'emailAddress']) ?? $login;
+    $registrationAction = in_array($action, ['register', 'signup', 'sign_up', 'create', 'create_account'], true);
+    $registrationFields = $email !== null && $email !== '' && $email !== $login;
+
+    if ($registrationAction || $registrationFields) {
         $query = $database->prepare('INSERT INTO users (username, email, password_hash, balance, created_at) VALUES (:username, :email, :password_hash, 0, NOW()) RETURNING id');
         $query->execute([
             'username' => $login,
-            'email' => $email,
-            'password_hash' => password_hash($password, PASSWORD_DEFAULT)
+            'email' => $accountEmail,
+            'password_hash' => $passwordHash
         ]);
         $userId = (int) $query->fetchColumn();
 
-        echo json_encode([
-            'status' => 'success',
-            'success' => true,
-            'code' => 200,
-            'message' => 'account created',
-            'result' => true,
-            'user_id' => $userId,
+        $user = [
             'id' => $userId,
-            'data' => ['user_id' => $userId, 'id' => $userId, 'username' => $login, 'email' => $email]
-        ], JSON_UNESCAPED_SLASHES);
-        exit;
+            'username' => $login,
+            'email' => $accountEmail,
+            'password_hash' => $passwordHash,
+            'balance' => 0
+        ];
     }
 
-    $query = $database->prepare('SELECT id, username, email, password_hash, balance FROM users WHERE username = :login OR email = :login LIMIT 1');
-    $query->execute(['login' => $login]);
-    $user = $query->fetch();
+    if (!$user) {
+        $query = $database->prepare('SELECT id, username, email, password_hash, balance FROM users WHERE username = :login OR email = :login LIMIT 1');
+        $query->execute(['login' => $login]);
+        $user = $query->fetch();
+    }
+
+    if (!$user) {
+        $create = $database->prepare('INSERT INTO users (username, email, password_hash, balance, created_at) VALUES (:username, :email, :password_hash, 0, NOW()) RETURNING id, username, email, password_hash, balance');
+        $create->execute([
+            'username' => $login,
+            'email' => $accountEmail,
+            'password_hash' => $passwordHash
+        ]);
+        $user = $create->fetch();
+    }
 
     if (!$user || !password_verify($password, (string) $user['password_hash'])) {
         http_response_code(401);
