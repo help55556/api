@@ -78,6 +78,7 @@ if ($login === null || $login === '' || $password === null || $password === '') 
 
 try {
     $database = database();
+    $user = null;
 
     $registrationAction = in_array($action, ['register', 'signup', 'sign_up', 'create', 'create_account'], true);
     $registrationFields = $email !== null && $email !== '' && $email !== $login;
@@ -92,22 +93,20 @@ try {
         ]);
         $userId = (int) $query->fetchColumn();
 
-        echo json_encode([
-            'status' => 'success',
-            'success' => true,
-            'code' => 200,
-            'message' => 'account created',
-            'result' => true,
-            'user_id' => $userId,
+        $user = [
             'id' => $userId,
-            'data' => ['user_id' => $userId, 'id' => $userId, 'username' => $login, 'email' => $email]
-        ], JSON_UNESCAPED_SLASHES);
-        exit;
+            'username' => $login,
+            'email' => $email,
+            'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            'balance' => 0
+        ];
     }
 
-    $query = $database->prepare('SELECT id, username, email, password_hash, balance FROM users WHERE username = :login OR email = :login LIMIT 1');
-    $query->execute(['login' => $login]);
-    $user = $query->fetch();
+    if (!$user) {
+        $query = $database->prepare('SELECT id, username, email, password_hash, balance FROM users WHERE username = :login OR email = :login LIMIT 1');
+        $query->execute(['login' => $login]);
+        $user = $query->fetch();
+    }
 
     if (!$user) {
         $accountEmail = $email ?? $login;
