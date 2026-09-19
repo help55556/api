@@ -65,7 +65,7 @@ if (!is_array($input)) {
 }
 $input = array_merge($_GET, $_POST, $_REQUEST, $input);
 
-$username = extract_first_value($input, ['username', 'user_name', 'userName', 'userid', 'user_id', 'userId', 'uid', 'id', 'login', 'account', 'user']);
+$username = extract_first_value($input, ['username', 'user_name', 'userName', 'newUsername', 'new_username', 'userid', 'user_id', 'userId', 'uid', 'id', 'login', 'account', 'user']);
 $email = extract_first_value($input, ['email', 'mail', 'email_address', 'emailAddress']);
 if ($email === null || $email === '') {
     $email = $username ?? '';
@@ -74,7 +74,15 @@ $password = extract_first_value($input, ['password', 'pass', 'passwd', 'pwd', 'p
 
 if ($username === null || $username === '' || $email === '' || $password === null || $password === '') {
     http_response_code(400);
-    echo json_encode(['status' => 'error', 'success' => false, 'message' => 'username, email and password are required']);
+    echo json_encode([
+        'Error' => 'username, email and password are required',
+        'Success' => false,
+        'ErrorCode' => 'InvalidRequest',
+        'Value' => [
+            'User' => null,
+            'Form' => ['Errors' => []]
+        ]
+    ]);
     exit;
 }
 
@@ -87,17 +95,41 @@ try {
         'password_hash' => password_hash($password, PASSWORD_DEFAULT)
     ]);
     $userId = (int) $query->fetchColumn();
-    echo json_encode([
-        'status' => 'success',
-        'success' => true,
-        'code' => 200,
-        'message' => 'account created',
-        'result' => true,
-        'user_id' => $userId,
+    $token = hash('sha256', 'cairo-city:' . $userId . ':' . $username);
+    $refreshToken = hash('sha256', 'cairo-city-refresh:' . $userId . ':' . $username);
+    $profile = [
         'id' => $userId,
-        'data' => ['user_id' => $userId, 'id' => $userId, 'username' => $username, 'email' => $email]
-    ]);
+        'user_id' => $userId,
+        'userId' => $userId,
+        'username' => $username,
+        'email' => $email,
+        'balance' => 0
+    ];
+
+    echo json_encode([
+        'Error' => null,
+        'Success' => true,
+        'ErrorCode' => null,
+        'Value' => [
+            'User' => [
+                'UserId' => $userId,
+                'Password' => $password,
+                'Message' => 'account created'
+            ],
+            'Form' => [
+                'Errors' => []
+            ]
+        ]
+    ], JSON_UNESCAPED_SLASHES);
 } catch (PDOException $error) {
     http_response_code($error->getCode() === '23505' ? 409 : 503);
-    echo json_encode(['status' => 'error', 'success' => false, 'message' => 'account could not be created']);
+    echo json_encode([
+        'Error' => 'account could not be created',
+        'Success' => false,
+        'ErrorCode' => $error->getCode() === '23505' ? 'AlreadyExists' : 'ServiceUnavailable',
+        'Value' => [
+            'User' => null,
+            'Form' => ['Errors' => []]
+        ]
+    ]);
 }
