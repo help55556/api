@@ -9,6 +9,6 @@ echo json_encode([
     'latest_version' => '256.0.3',
     'version' => '256.0.3',
     'app' => 'Gooobet',
-    'apk_url' => 'https://myapi-production-6eda.up.railway.app/api/android/apk/Gooobet.apk',
+    'apk_url' => 'https://api-production-69b69.up.railway.app/api/android/apk/Gooobet.apk',
     'message' => 'up to date'
 ], JSON_UNESCAPED_SLASHES);
