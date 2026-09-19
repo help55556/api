@@ -8,4 +8,4 @@ RUN apt-get update \
 WORKDIR /app
 COPY . .
 
-CMD ["sh", "-c", "php -S 0.0.0.0:${PORT:-8080} -t /app"]
+CMD ["sh", "-c", "php -S 0.0.0.0:${PORT:-8080} -t /app /app/router.php"]
